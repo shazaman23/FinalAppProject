@@ -16,6 +16,24 @@
  * specific language governing permissions and limitations
  * under the License.
  */
+
+ var util = {
+   store: function(namespace, data){
+     if(arguments.length > 1)
+     {
+       return localStorage.setItem(namespace, JSON.stringify(data));
+     } else {
+       var store = localStorage.getItem(namespace);
+       if(store)
+       {
+         return JSON.parse(store);
+       } else {
+         return [];
+       }
+     }
+   }
+ };
+
 var app = {
     // Application Constructor
     initialize: function() {
@@ -33,18 +51,75 @@ var app = {
     // The scope of 'this' is the event. In order to call the 'receivedEvent'
     // function, we must explicitly call 'app.receivedEvent(...);'
     onDeviceReady: function() {
-        app.receivedEvent('deviceready');
+        app.posts = util.store('posts');
+        app.loadTemplates();
+        app.render('container', 'entries', {posts: app.posts});
+        app.registerCallbacks();
+    },
+    loadTemplates: function(){
+      var templates = [ 'entries', 'addEntryForm', 'entry' ];
+
+      var templateText = '';
+
+      app.templates = {};
+
+      for (var i=0; i<templates.length; i++)
+      {
+        var templateText = document.getElementById(templates[i]).text;
+
+        app.templates[templates[i]] = new EJS({text: templateText});
+      }
+    },
+    registerCallbacks: function(){
+      $('body').on('click', 'a', function(evt){
+        evt.preventDefault();
+        history.pushState({}, '', $(this).attr('href'));
+        //render stuff
+        app.route(location.pathname);
+      })
+      $("#container").on('click', '#submit', app.addEntry);
+      $("#container").on('click', '.delete', app.deleteEntry);
+    },
+    route: function(path){
+      console.log('route' + path);
+      if (path === '/add') {
+        console.log('Adding an Entry element');
+        app.render('container', 'addEntryForm', {});
+        return
+      }
+      if(/\/entries\/(\d*)/.test(path) )
+      {
+        var id = parseInt( path.match(/\/entries\/(\d*)/)[1] );
+        app.render('container', 'entry', {post: app.posts[id]});
+        return
+      }
+      app.render('container', 'entries', {posts: app.posts});
+    },
+    addEntry: function(evt) {
+      evt.preventDefault();
+
+      var slug = $("#slug").val();
+      var body = $("#body").val();
+      var entry = {slug: slug, body: body};
+
+      app.posts.push(entry);
+      util.store('posts', app.posts)
+      app.render("container", "entries", {posts: app.posts});
+    },
+    deleteEntry: function(){
+      var entryID = $(this).attr('data-id');
+      app.posts.splice(entryID, 1);
+      util.store('posts', app.posts);
+
+      app.render("container", "entries", {posts: app.posts});
     },
     // Update DOM on a Received Event
-    receivedEvent: function(id) {
-        var parentElement = document.getElementById(id);
-        var listeningElement = parentElement.querySelector('.listening');
-        var receivedElement = parentElement.querySelector('.received');
+    render: function(id, template, data) {
+        var containerElement = document.getElementById(id);
 
-        listeningElement.setAttribute('style', 'display:none;');
-        receivedElement.setAttribute('style', 'display:block;');
+        var html = app.templates[template].render(data);
 
-        console.log('Received Event: ' + id);
+        containerElement.innerHTML = html;
     }
 };
 
